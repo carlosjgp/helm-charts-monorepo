@@ -1,0 +1,11 @@
+{{- if .Values.telemetry.prometheus.prometheusRules.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "launch-darkly.fullname" . }}
+  labels:
+    {{- include "launch-darkly.labels" . | nindent 4 }}
+spec:
+  groups:
+    {{- .Values.telemetry.prometheus.prometheusRules.ruleGroups | toYaml | nindent 4 }}
+{{- end }}

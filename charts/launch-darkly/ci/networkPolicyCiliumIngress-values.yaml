@@ -1,0 +1,10 @@
+networkPolicy:
+  flavour: cilium
+  ingress:
+    - fromEndpoints:
+      - matchLabels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/name: ingress-nginx
+        matchExpressions:  # Any namespace
+          - key: io.kubernetes.pod.namespace
+            operator: Exists

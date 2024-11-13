@@ -1,0 +1,25 @@
+{{- if .Values.telemetry.prometheus.serviceMonitor.enabled }}
+# https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#servicemonitorspec
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "launch-darkly.fullname" . }}
+  labels:
+    {{- include "launch-darkly.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "launch-darkly.selectorLabels" . | nindent 6 }}
+  # https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#endpoint
+  endpoints:
+{{- range $key, $value := index .Values "ld.conf" }}
+{{- if and (eq $key "Prometheus") $value.enabled }}
+    - port: metrics  # Name of the port on Service
+      path: /metrics
+{{- end }}
+{{- end }}
+{{- if .Values.statusExporter.enabled }}
+    - port: status-metrics  # Name of the port on Service
+      path: /metrics
+{{- end }}
+{{- end }}

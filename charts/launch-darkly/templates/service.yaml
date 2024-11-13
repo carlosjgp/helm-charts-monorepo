@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "launch-darkly.fullname" . }}
+  labels:
+    {{- include "launch-darkly.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    {{- range $key, $value := index .Values "ld.conf" }}
+    {{- if and (eq $key "Prometheus") $value.enabled }}
+    - port: {{ $value.port }}
+      targetPort: {{ $value.port }}
+      protocol: TCP
+      name: metrics
+    {{- end }}
+    {{- end }}
+    {{- if .Values.statusExporter.enabled }}
+    - port: {{ .Values.statusExporter.port }}
+      targetPort: {{ .Values.statusExporter.port }}
+      protocol: TCP
+      name: status-metrics
+    {{- end }}
+  selector:
+    {{- include "launch-darkly.selectorLabels" . | nindent 4 }}

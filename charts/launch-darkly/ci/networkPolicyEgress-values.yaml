@@ -1,0 +1,9 @@
+networkPolicy:
+  egress:
+    - to:
+        - namespaceSelector:  # filter by namespace labels
+            matchLabels:
+              label: value
+          podSelector:
+            matchLabels:
+              oaknorth.com/network-allowed: "true"

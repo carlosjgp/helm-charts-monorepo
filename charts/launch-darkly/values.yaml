@@ -1,0 +1,145 @@
+# Default values for launch-darkly.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 2
+
+ecrAwsRegion: us-east-1  # Default ECR region
+
+podDisruptionBudget:
+  maxUnavailable: 50%
+
+image:
+  repository: launchdarkly/ld-relay
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag:
+
+# https://github.com/launchdarkly/ld-relay/blob/v6/docs/configuration.md
+ld.conf:
+  Main:
+    ignoreConnectionErrors: true
+    disableInternalUsageMetrics: true
+  Prometheus:
+    enabled: true
+    port: 8031
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: "cluster-ingress"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1$2
+  hosts:
+    - paths:
+      - path: /api/feature-flags/(sdk|events|eval)(.*)  # We're doing this becuase we don't want to expose /status
+        pathType: Prefix
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: null
+  external: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+containerPort: 8030
+
+env: []
+  ## Examples:
+  # - name: LD_ENV_Production
+  #   value: "sdk-"
+  # - name: REDIS_PASSWORD
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: redis
+  #       key: redis-password
+  #       optional: false
+
+networkPolicy:
+  flavour: ""  # Accepted values are "cilium" or "" (K8s native)
+  ingress: []
+  egress: []
+    ## Native K8s NP
+    # - ports:
+    #   - port: 6379
+    #     protocol: TCP
+    #   to:
+    #   - podSelector:
+    #       matchLabels:
+    #         app.kubernetes.io/instance: redis
+    #         app.kubernetes.io/name: redis
+    ## Cilium NP
+    # - toEndpoints:
+    #     - matchLabels:
+    #         app.kubernetes.io/name: redis
+    #         app.kubernetes.io/instance: redis
+    #   toPorts:
+    #     - ports:
+    #         - port: "6379"
+
+statusExporter:
+  enabled: false
+  port: 8080
+  ldRelayStatusUrl: http://localhost:8030/status
+  image:
+    repository: ""
+    pullPolicy: IfNotPresent
+    tag: "0.0.1"
+  resources: {}
+  securityContext: {}
+
+telemetry:
+  prometheus:
+    serviceMonitor:
+      enabled: true
+    prometheusRules:
+      enabled: false
+      ruleGroups: []

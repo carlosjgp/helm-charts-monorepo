@@ -1,0 +1,23 @@
+telemetry:
+  prometheus:
+    serviceMonitor:
+      enabled: false
+    prometheusRules:
+      enabled: true
+      ruleGroups:
+        # Groups are just a way to organise rules
+        - name: example.rules
+          # rulesSpec: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#rule
+          # expr: uses PromQL https://prometheus.io/docs/prometheus/latest/querying/basics/
+          rules:
+            - alert: ExampleAlert
+              expr: vector(1)
+              label:
+                severity: critical|warning
+            - record: example_calculated_metric
+              expr: vector(1)
+            - record: example_complicated_calculated_metric
+              expr: |
+                vector(1)
+                +
+                vector(1)

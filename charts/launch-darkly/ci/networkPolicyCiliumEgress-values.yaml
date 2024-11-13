@@ -1,0 +1,7 @@
+networkPolicy:
+  flavour: cilium
+  egress:
+    - toEndpoints:
+      - matchLabels:
+          k8s-app: kube-dns
+          io.kubernetes.pod.namespace: kube-system  # Filter by namespace

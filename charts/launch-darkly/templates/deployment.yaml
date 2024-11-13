@@ -1,0 +1,113 @@
+{{- $deploymentImage := include "launch-darkly.deploymentImage" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "launch-darkly.fullname" . }}
+  labels:
+    {{- include "launch-darkly.labels" . | nindent 4 }}
+  annotations:
+    {{- include "launch-darkly.deployment.annotations" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "launch-darkly.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "launch-darkly.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "launch-darkly.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ $deploymentImage | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config=/tmp/cfg/ld.conf
+            - --allow-missing-file
+            - --from-env
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort}}
+              protocol: TCP
+            {{- range $key, $value := index .Values "ld.conf" }}
+            {{- if and (eq $key "Prometheus") $value.enabled }}
+            - name: metrics
+              containerPort: {{ $value.port }}
+              protocol: TCP
+            {{- end }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.env }}
+          env:
+          {{- include "common.tplvalues.render" (dict "value" .Values.env "context" $) | nindent 10 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /tmp/cfg/
+        {{- if .Values.statusExporter.enabled }}
+        - name: {{ .Chart.Name }}-status-exporter
+          securityContext:
+            {{- toYaml .Values.statusExporter.securityContext | nindent 12 }}
+          image: {{ include "launch-darkly.exporter.image" . | quote }}
+          imagePullPolicy: {{ .Values.statusExporter.image.pullPolicy }}
+          ports:
+            - name: status-http
+              containerPort: {{ .Values.statusExporter.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: status-http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: status-http
+          resources:
+            {{- toYaml .Values.statusExporter.resources | nindent 12 }}
+          env:
+            - name: PORT
+              value: {{ .Values.statusExporter.port | quote }}
+            - name: LD_RELAY_STATUS_URL
+              value: {{ .Values.statusExporter.ldRelayStatusUrl | quote }}
+        {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "launch-darkly.fullname" . }}
+            optional: false
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

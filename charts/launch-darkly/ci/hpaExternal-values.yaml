@@ -1,0 +1,10 @@
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  external:
+    - metric:
+        name: external:metric
+      target:
+        type: averageValue
+        averageValue: 50

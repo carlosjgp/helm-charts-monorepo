@@ -1,0 +1,225 @@
+---
+# Source: launch-darkly/templates/poddisruptionbudget.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: release-name-launch-darkly
+  labels:
+    helm.sh/chart: launch-darkly-1.3.1
+    app.kubernetes.io/name: launch-darkly
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 7.0.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  maxUnavailable: 50%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: launch-darkly
+      app.kubernetes.io/instance: release-name
+---
+# Source: launch-darkly/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: release-name-launch-darkly
+  labels:
+    helm.sh/chart: launch-darkly-1.3.1
+    app.kubernetes.io/name: launch-darkly
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 7.0.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: launch-darkly/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: release-name-launch-darkly
+  labels:
+    helm.sh/chart: launch-darkly-1.3.1
+    app.kubernetes.io/name: launch-darkly
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 7.0.0
+    app.kubernetes.io/managed-by: Helm
+data:
+  ld.conf: |
+    [Main]
+    disableInternalUsageMetrics = true
+    ignoreConnectionErrors = true
+    [Prometheus]
+    enabled = true
+    port = 8031
+---
+# Source: launch-darkly/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-name-launch-darkly
+  labels:
+    helm.sh/chart: launch-darkly-1.3.1
+    app.kubernetes.io/name: launch-darkly
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 7.0.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 8031
+      targetPort: 8031
+      protocol: TCP
+      name: metrics
+  selector:
+    app.kubernetes.io/name: launch-darkly
+    app.kubernetes.io/instance: release-name
+---
+# Source: launch-darkly/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-launch-darkly
+  labels:
+    helm.sh/chart: launch-darkly-1.3.1
+    app.kubernetes.io/name: launch-darkly
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 7.0.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: launch-darkly
+      app.kubernetes.io/instance: release-name
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: launch-darkly
+        app.kubernetes.io/instance: release-name
+    spec:
+      serviceAccountName: release-name-launch-darkly
+      securityContext:
+        {}
+      containers:
+        - name: launch-darkly
+          securityContext:
+            {}
+          image: "launchdarkly/ld-relay:7.0.0"
+          imagePullPolicy: IfNotPresent
+          args:
+            - --config=/tmp/cfg/ld.conf
+            - --allow-missing-file
+            - --from-env
+          ports:
+            - name: http
+              containerPort: 8030
+              protocol: TCP
+            - name: metrics
+              containerPort: 8031
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: http
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: config
+              mountPath: /tmp/cfg/
+      volumes:
+        - name: config
+          configMap:
+            name: release-name-launch-darkly
+            optional: false
+---
+# Source: launch-darkly/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: release-name-launch-darkly
+  labels:
+    helm.sh/chart: launch-darkly-1.3.1
+    app.kubernetes.io/name: launch-darkly
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 7.0.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: release-name-launch-darkly
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: External
+      external:
+        metric:
+          name: external:metric
+        target:
+          averageValue: 50
+          type: averageValue
+---
+# Source: launch-darkly/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: release-name-launch-darkly
+  labels:
+    helm.sh/chart: launch-darkly-1.3.1
+    app.kubernetes.io/name: launch-darkly
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 7.0.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1$2
+spec:
+  ingressClassName: cluster-ingress
+  rules:
+    - http:
+        paths:
+          - path: /api/feature-flags/(sdk|events|eval)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: release-name-launch-darkly
+                port:
+                  number: 80
+---
+# Source: launch-darkly/templates/prometheus_servicemonitor.yaml
+# https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#servicemonitorspec
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: release-name-launch-darkly
+  labels:
+    helm.sh/chart: launch-darkly-1.3.1
+    app.kubernetes.io/name: launch-darkly
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 7.0.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: launch-darkly
+      app.kubernetes.io/instance: release-name
+  # https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#endpoint
+  endpoints:
+    - port: metrics  # Name of the port on Service
+      path: /metrics
